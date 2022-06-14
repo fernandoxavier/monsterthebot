@@ -118,114 +118,286 @@ const discord = new Discord.Client({
 });
 
 const settings = {
-    prefix: '-',
     token: process.env.DISCORDJS_BOT_TOKEN
 };
 
-
 const player = new Player(discord, {
-    leaveOnEmpty: false,
+    leaveOnEmpty: true,
+    leaveOnEnd: false,
+    deafenOnJoin: true
 });
 
 discord.player = player;
 
 discord.on("ready", () => {
     console.log("Pai ta on 😎");
+
+    const guild = discord.guilds.cache.get(process.env.DISCORD_GUILDID)
+
+    if (guild) {
+        commands = guild.commands
+    } else [
+        commands = client.application?.commands
+    ]
+
+    commands?.create({
+        name: 'play',
+        description: 'Toca uma música',
+        options: [
+            {
+                name: 'query',
+                description: 'Nome ou link da música',
+                required: true,
+                type: Discord.Constants.ApplicationCommandOptionTypes.STRING
+            }
+        ]
+    })
+
+    commands?.create({
+        name: 'playlist',
+        description: 'Toca uma playlist',
+        options: [
+            {
+                name: 'query',
+                description: 'Link da playlist',
+                required: true,
+                type: Discord.Constants.ApplicationCommandOptionTypes.STRING
+            }
+        ]
+    })
+
+    commands?.create({
+        name: 'stop',
+        description: 'Para a playlist',
+    })
+
+    commands?.create({
+        name: 'skip',
+        description: 'Pula a música atual',
+    })
+
+    commands?.create({
+        name: 'disableloop',
+        description: 'Desabilita o loop',
+    })
+
+    commands?.create({
+        name: 'loop',
+        description: 'Habilita o loop da música atual',
+    })
+
+    commands?.create({
+        name: 'queueloop',
+        description: 'Habilita o loop da playlist atual',
+    })
+
+    commands?.create({
+        name: 'setvolume',
+        description: 'Muda o volume da música de 0 a 100, exemplo "/setvolume 50"',
+        options: [
+            {
+                name: 'volume',
+                description: 'O valor do volume',
+                required: true,
+                type: Discord.Constants.ApplicationCommandOptionTypes.NUMBER
+            }
+        ]
+    })
+
+    commands?.create({
+        name: 'clear',
+        description: 'Limpa a queue atual',
+    })
+
+    commands?.create({
+        name: 'shuffle',
+        description: 'Randomiza a ordem da queue atual',
+    })
+
+    commands?.create({
+        name: 'queue',
+        description: 'Mostra a queue atual de músicas',
+    })
+
+    commands?.create({
+        name: 'volume',
+        description: 'Mostra o volume atual da música',
+    })
+
+    commands?.create({
+        name: 'song',
+        description: 'Mostra a música atual tocando',
+    })
+
+    commands?.create({
+        name: 'pause',
+        description: 'Pausa a música atual',
+    })
+
+    commands?.create({
+        name: 'resume',
+        description: 'Retoma a música atual',
+    })
+
+    commands?.create({
+        name: 'remove',
+        description: 'Remove o som indicado, verificar id da música com "/queue"',
+        options: [
+            {
+                name: 'songid',
+                description: 'O id da música',
+                required: true,
+                type: Discord.Constants.ApplicationCommandOptionTypes.NUMBER
+            }
+        ]
+    })
+
 });
 
 discord.login(settings.token);
 
-discord.on('messageCreate', async (message) => {
-    const args = message.content.slice(settings.prefix.length).trim().split(/ +/g);
-    const command = args.shift();
-    let guildQueue = discord.player.getQueue(message.guild.id);
+discord.on('interactionCreate', async (interaction) => {
+    if (!interaction.isCommand()) {
+        return
+    }
+    
+    const { commandName, options } = interaction
 
-    if(command === 'play' || command === 'p') {
-        let queue = discord.player.createQueue(message.guild.id, {
+    const Guild = discord.guilds.cache.get(interaction.guildId);
+    const Member = Guild.members.cache.get(interaction.user.id);
+
+    let guildQueue = discord.player.getQueue(interaction.guildId);
+
+    if (commandName === 'ping') {
+        interaction.reply({
+            content: 'pong',
+            ephemeral: false
+        })
+    }
+
+    if (commandName === "play") {
+        await interaction.deferReply();
+
+        const query = options.getString('query');
+
+        let queue = discord.player.createQueue(interaction.guildId, {
             data: {
-                queueInitMessage: message,
+                queueInitMessage: interaction,
             }
         });
-        await queue.join(message.member.voice.channel);
-        let song = await queue.play(args.join(' ')).catch(_ => {
+
+        await queue.join(Member.voice.channel);
+        
+        let song = await queue.play(query).catch(_ => {
             if(!guildQueue)
-                message.channel.send('Ocorreu algum problema, xinga o preud 😡')
+                interaction.channelId.send('Ocorreu algum problema, xinga o preud 😡')
                 queue.stop(); 
-        });
+        }); 
 
-
-
-        console.log('song', song);
-        console.log('msg', message);
-        console.log('msg', args);
-
-        message.channel.send('🎵  **Procurando** 🔎' + '`' + args + '`' + '\n' + 
-        '**Adicionada a queue 🎶 **`' + song + '`');
+        await interaction.editReply({
+            content: '🎵  **Procurando** 🔎' + '`' + query + '`' + '\n' + 
+            '**Adicionada a queue 🎶 **`' + song + '`',
+            ephemeral: false
+        })
         
     }
 
-    if(command === 'playlist') {
-        let queue = discord.player.createQueue(message.guild.id, {
+    if (commandName === 'playlist') {
+        await interaction.deferReply();
+
+        const query = options.getString('query');
+
+        let queue = discord.player.createQueue(interaction.guildId, {
             data: {
-                queueInitMessage: message,
+                queueInitMessage: interaction,
             }
         });
-        await queue.join(message.member.voice.channel);
-        let song = await queue.playlist(args.join(' ')).catch(_ => {
+
+        await queue.join(Member.voice.channel);
+
+        let song = await queue.playlist(query).catch(_ => {
             if(!guildQueue)
-                message.channel.send('Ocorreu algum problema, xinga o preud 😡')
+                interaction.channelId.send('Ocorreu algum problema, xinga o preud 😡')
                 queue.stop();
         });
 
-        message.channel.send(`🎶 **Playlist adicionada!** 👍`);
+        await interaction.editReply({
+            content: '🎶 **Playlist adicionada!** 👍',
+            ephemeral: false
+        })
+
     }
 
-    if(command === 'skip') {
+    if (commandName === 'skip') {
         guildQueue.skip();
-        message.channel.send('⏩ **Skipado** 👍');
+        await interaction.reply({
+            content: '⏩ **Skipado** 👍',
+            ephemeral: false
+        })
     }
 
-    if(command === 'stop') {
+    if (commandName === 'stop') {
         guildQueue.stop();
         message.channel.send('⏩ **Skipado** 👍');
+        await interaction.reply({
+            content: '⏩ **Skipado** 👍',
+            ephemeral: false
+        })
     }
 
-    if(command === 'disableLoop') {
+    if (commandName === 'disableloop') {
         guildQueue.setRepeatMode(RepeatMode.DISABLED); 
-        message.channel.send('🔂 **Loop desabilitado** ⛔️');
+        await interaction.reply({
+            content: '🔂 **Loop desabilitado** ⛔️',
+            ephemeral: false
+        })
     }
 
-    if(command === 'loop') {
+    if (commandName === 'loop') {
         guildQueue.setRepeatMode(RepeatMode.SONG);
-        message.channel.send('🔁 **Loop habilitado** ✅');
+        await interaction.reply({
+            content: '🔁 **Loop habilitado** ✅',
+            ephemeral: false
+        })
     }
 
-    if(command === 'queueLoop') {
+    if (commandName === 'queueloop') {
         guildQueue.setRepeatMode(RepeatMode.QUEUE);
-        message.channel.send('🔁 **Loop da queue habilitado** ✅');
+        await interaction.reply({
+            content: '🔁 **Loop da queue habilitado** ✅',
+            ephemeral: false
+        })
     }
 
-    if(command === 'setVolume') {
-        guildQueue.setVolume(parseInt(args[0]));
-        message.channel.send('🔊 **Volume alterado** 👍');
+    if (commandName === 'setvolume') {
+        let volume = interaction.options.getNumber('volume');
+
+        guildQueue.setVolume(volume);
+
+        await interaction.reply({
+            content: '🔊 **Volume alterado** 👍',
+            ephemeral: false
+        })
     }
 
-    if(command === 'seek') {
-        guildQueue.seek(parseInt(args[0]) * 1000);
-    }
-
-    if(command === 'clear') {
+    if (commandName === 'clear') {
         guildQueue.clearQueue();
-        message.channel.send('🗑 **Queue limpa** 👍');
+        message.channel.send('');
+        await interaction.reply({
+            content: '🗑 **Queue limpa** 👍',
+            ephemeral: false
+        })
     }
 
-    if(command === 'shuffle') {
+    if(commandName === 'shuffle') {
         guildQueue.shuffle();
-        message.channel.send('🔀 **Shuffle realizado** 👍');
+        await interaction.reply({
+            content: '🔀 **Shuffle realizado** 👍',
+            ephemeral: false
+        })
     }
 
-    if(command === 'queue' || command === 'q') {
-
+    if(commandName === 'queue') {
         let songList = '';
         let count = 0;
         
@@ -242,30 +414,56 @@ discord.on('messageCreate', async (message) => {
             count++
         });
 
-        message.channel.send('```' + songList + '```');
+        await interaction.reply({
+            content: '```' + songList + '```',
+            ephemeral: false
+        })
     }
 
-    if(command === 'volume') {
-        console.log(guildQueue.volume)
-        message.channel.send('🔊 **Volume atual**' + '`' + guildQueue.volume + '`');
+    if(commandName === 'volume') {
+        await interaction.reply({
+            content: '🔊 **Volume atual**' + '`' + guildQueue.volume + '`',
+            ephemeral: false
+        })
     }
 
-    if(command === 'song') {
-        message.channel.send('🎵 **Tocando agora**' + '`' + guildQueue.nowPlaying + '`');
+    if(commandName === 'song') {
+        await interaction.reply({
+            content: '🎵 **Tocando agora**' + '`' + guildQueue.nowPlaying + '`',
+            ephemeral: false
+        })
     }
 
-    if(command === 'pause') {
+    if(commandName === 'pause') {
         guildQueue.setPaused(true);
-        message.channel.send('⏸ **Queue pausada**');
+        
+        await interaction.reply({
+            content: '⏸ **Queue pausada**',
+            ephemeral: false
+        })
     }
 
-    if(command === 'resume') {
+    if(commandName === 'resume') {
         guildQueue.setPaused(false);
-        message.channel.send('▶️ **Queue despausada**');
+
+        await interaction.reply({
+            content: '▶️ **Queue despausada**',
+            ephemeral: false
+        })
     }
 
-    if(command === 'remove') {
-        message.channel.send('**✂️ Removido da queue** `' + guildQueue.songs[args[0]].name + '`' );
-        guildQueue.remove(parseInt(args[0]));
+    if(commandName === 'remove') {
+        let songId = interaction.options.getNumber('songid');
+
+        guildQueue.setVolume(volume);
+
+        await interaction.reply({
+            content: '**✂️ Removido da queue** `' + guildQueue.songs[songId].name + '`',
+            ephemeral: false
+        })
+
+        guildQueue.remove(parseInt(volume));
+        
     }
+
 })
