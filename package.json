@@ -3,8 +3,11 @@
     "discord-music-player": "^8.3.2",
     "discord.js": "^13.8.0",
     "dotenv": "^10.0.0",
+    "mongoose": "^6.3.8",
     "node": "^16.14.2",
+    "node-schedule": "^2.1.0",
     "pastebin-ts": "^1.2.0",
-    "tmi.js": "^1.8.5"
+    "tmi.js": "^1.8.5",
+    "ytdl-core": "^4.11.2"
   }
 }

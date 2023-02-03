@@ -1,115 +1,11 @@
 require('dotenv').config(); // dados criptografados
-const PastebinAPI = require('pastebin-ts'); // pastebin
-const tmi = require('tmi.js'); // integração twitch
 const Discord = require("discord.js"); // integração discord
 const { Player } = require("discord-music-player"); // biblioteca player
 const { RepeatMode } = require('discord-music-player'); // modo repeat
-
-// config pastebin
-const pastebin = new PastebinAPI({
-    'api_dev_key': process.env.PASTEBIN_API_KEY,
-    'api_user_name': process.env.PASTEBIN_USERNAME,
-    'api_user_password': process.env.PASTEBIN_PASSWORD
-});
-
-// INICIO TWITCH //
-
-// comandos chat twitch
-const commandsTwitch = {
-    sr: {
-        response: (argument) => `A música ${argument} foi adicionada à playlist!`
-    },
-    song: {
-        response: (argument) => `A música ${argument} foi adicionada à playlist!`
-    },
-    songlist: {
-        response: (argument) => `A música ${argument} foi adicionada à playlist!`
-    },
-    kit: {
-        response: 'Aqui nós 🧘 temos o kit mito 🇧🇷 bonézinho 🧢 calendário 📆 o copo 🥤 do mito 🇧🇷 o adesivo do mito 🇧🇷 já 🕑 é 🦧 pra 2022 🎆 todo mundo colocando no celular 📱 o óculos 🕶️ do mito 🇧🇷 a camisa do mito 👕 🇧🇷 o abridor do mito 🤗 🇧🇷 o mitoclock 🇧🇷 ⌚ que é sucesso 👌'
-    }
-}
-
-// obj twitch bot
-const twitchBot = new tmi.Client({
-    connection: {
-        reconnect: true
-    },
-    channels: ['AnaTheMonster'],
-    identity: {
-        username: process.env.TWITCH_BOT_USERNAME,
-        password: process.env.TWITCH_OAUTH_TOKEN
-    },
-});
-
-// conecta no chat da twitch 
-twitchBot.connect();
-
-// evento de mensagem no chat da twitch
-twitchBot.on('message', async (channel, context, message) => {
-
-    // verifica se é mensagem do bot
-    const isNotBot = context.username.toLowerCase() !== process.env.TWITCH_BOT_USERNAME.toLowerCase();
-    console.log(`${message}`);
-    if (!isNotBot) return;
-
-
-    const [raw, command, argument] = message.match(regexpCommand);
-
-    const {
-        response
-    } = commandsTwitch[command] || {};
-
-    // funções twitch
-    if (typeof response === 'function') {
-        if (command == 'sr') {
-            discord.channels.cache.get('753397528753602592').send(`${prefix}play ${argument}`);
-        } else if (command == 'song') {
-            client.say(`#anathemonster`, `A música atual é ${songQueue[0].title}`);
-        } else if (command == 'songlist') {
-            songList()
-        }
-    } else if (typeof response === 'string') {
-        client.say(channel, response);
-    }
-});
-
-// songlist do chat da twitch (pastebin)
-function songList() {
-    var fs = require('fs');
-
-
-    let count = 1;
-    let jsonText = '';
-
-    // escreve no arquivo de texto
-    for (const [key, value] of Object.entries(songQueue)) {
-        jsonText += count + '. ' + value.title + ' - ' + value.url + '\r\n';
-        count++;
-    }
-
-
-    fs.writeFile("test.txt", jsonText, function (err) {
-        if (err) {
-            console.log(err);
-        }
-        pastebin
-            .createPasteFromFile({
-                'file': './test.txt',
-                'title': 'songlist'
-            })
-            .then((data) => {
-                // we have succesfully pasted it. Data contains the id
-                console.log(data);
-                client.say(`#anathemonster`, `Link para a playlist atual: ${data}`);
-            })
-            .catch((err) => {
-                console.log(err);
-            });
-    });
-}
-
-// FIM TWITCH //
+const mongoose = require('mongoose');
+const birthdaySchema = require('./birthday-schema')
+const schedule = require('node-schedule');
+const COOKIE = process.env.YOUTUBE_COOKIE
 
 // INICIO DISCORD //
 
@@ -124,21 +20,94 @@ const settings = {
 const player = new Player(discord, {
     leaveOnEmpty: true,
     leaveOnEnd: false,
-    deafenOnJoin: true
+    deafenOnJoin: true,
+    ytdlRequestOptions: {headers:{
+        Cookie: COOKIE,
+        'x-youtube-identity-token': 'QUFFLUhqbm15OEpRTGtQVWt5QzAzamp3UzFfbm1IdUFJQXw='
+    }}
 });
 
 discord.player = player;
 
+
 discord.on("ready", () => {
+    mongoose.connect(
+        process.env.MONGO_URI,
+        {
+            keepAlive: true
+        }
+    )
+
     console.log("Pai ta on 😎");
 
     const guild = discord.guilds.cache.get(process.env.DISCORD_GUILDID)
+    const channel = guild.channels.cache.get('521356562573426700');
+
+    var j = schedule.scheduleJob('00 00 12 * * 0-6', async () => {
+        var listBirthday = checkBirthday()
+
+        listBirthday.then(total => {
+
+            if (total.length >= 1) {
+                console.log(total)
+                channel.send('Gostaria de desejar em nome da familia monster um feliz aniversário a @' + total[0].username + ', muitas felicidades e saúde!');
+            }   
+            
+        })
+    });
 
     if (guild) {
         commands = guild.commands
     } else [
         commands = client.application?.commands
     ]
+
+
+    // comandos aniversário
+
+    commands?.create({
+        name: 'birthdayadd',
+        description: 'Adiciona um usuário a lista de aniversariantes',
+        options: [
+            {
+                name: 'username',
+                description: 'Nome do usuário',
+                required: true,
+                type: Discord.Constants.ApplicationCommandOptionTypes.STRING
+            },
+            {
+                name: 'data',
+                description: 'Dia/Mes/Ano',
+                required: true,
+                type: Discord.Constants.ApplicationCommandOptionTypes.STRING
+            },
+        ]
+    })
+
+    commands?.create({
+        name: 'birthdayremove',
+        description: 'Remove um usuário da lista de aniversariantes',
+        options: [
+            {
+                name: 'username',
+                description: 'Nome do usuário',
+                required: true,
+                type: Discord.Constants.ApplicationCommandOptionTypes.STRING
+            },
+        ]
+    })
+
+    commands?.create({
+        name: 'birthdaylist',
+        description: 'Mostra a lista de aniversariantes',
+    })
+
+    commands?.create({
+        name: 'birthdaynext',
+        description: 'Indica o próximo aniversariante',
+    })
+
+    // comandos música
 
     commands?.create({
         name: 'play',
@@ -256,6 +225,14 @@ discord.on("ready", () => {
 
 discord.login(settings.token);
 
+discord.on('error', (queue, err) => {
+    console.error(err);
+});
+
+discord.on('uncaughtException', function (error) {
+    console.error(error);
+});
+
 discord.on('interactionCreate', async (interaction) => {
     if (!interaction.isCommand()) {
         return
@@ -267,6 +244,63 @@ discord.on('interactionCreate', async (interaction) => {
     const Member = Guild.members.cache.get(interaction.user.id);
 
     let guildQueue = discord.player.getQueue(interaction.guildId);
+
+
+    if (commandName === 'birthdayadd') {
+        await interaction.deferReply();
+
+        let usernameInput = options.getString('username');
+        let birthdateInput = options.getString('data');
+        let birthdateConverted = birthdateInput.replace(/\//g, "-").split("-").reverse().join("-");
+
+        await new birthdaySchema({
+            username: usernameInput,
+            birthdate: birthdateConverted + 'T00:00:00.000Z' 
+        }).save()
+
+        await interaction.editReply({
+            content: '**' + usernameInput + '** foi adicionado a lista de aniversariantes 📝',
+            ephemeral: false
+        })
+    }
+
+    if (commandName === 'birthdaylist') {
+        await interaction.deferReply();
+
+
+        let birthdayDoc = await birthdaySchema.aggregate([
+            {
+              $project: {
+                username: 1,
+                birthdate: {
+                  $dateToString: {
+                    format: "%d/%m/%Y",
+                    date: "$birthdate"
+                  }
+                },
+                month: { "$month": "$birthdate" },
+                day: { "$dayOfMonth": "$birthdate" }
+              }
+            },
+            {
+                $sort: { "month": 1, 'day': 1 },
+            },
+            
+        ])
+
+        let birthdayList = ''
+        let count = 0
+
+        birthdayDoc.forEach(birthday => {
+            birthdayList += count + '. ' + birthday.username + ' - ' + birthday.birthdate + '\n';
+            count++
+        });
+
+        await interaction.editReply({
+            content: '```' + birthdayList + '```',
+            ephemeral: true
+        })
+    }
 
     if (commandName === 'ping') {
         interaction.reply({
@@ -289,9 +323,10 @@ discord.on('interactionCreate', async (interaction) => {
         await queue.join(Member.voice.channel);
         
         let song = await queue.play(query).catch(_ => {
-            if(!guildQueue)
+            if(!guildQueue){
                 interaction.channelId.send('Ocorreu algum problema, xinga o preud 😡')
                 queue.stop(); 
+            }
         }); 
 
         await interaction.editReply({
@@ -310,7 +345,7 @@ discord.on('interactionCreate', async (interaction) => {
         let queue = discord.player.createQueue(interaction.guildId, {
             data: {
                 queueInitMessage: interaction,
-            }
+            },
         });
 
         await queue.join(Member.voice.channel);
@@ -467,3 +502,31 @@ discord.on('interactionCreate', async (interaction) => {
     }
 
 })
+
+async function checkBirthday() {
+    console.log('check niver')
+
+    var dt = new Date();dt.setHours(dt.getHours() - 3 );
+    let dayMonth = dt.getDate();
+    let monthYear = dt.getMonth() + 1;
+
+    let birthdayDoc = await birthdaySchema.aggregate([
+        {
+          $project: {
+            username: 1,
+            birthdate: {
+              $dateToString: {
+                format: "%d/%m/%Y",
+                date: "$birthdate"
+              }
+            },
+            month: { "$month": "$birthdate" },
+            day: { "$dayOfMonth": "$birthdate" }
+          }
+        },
+        {$match: {month: monthYear, day: dayMonth}}
+        
+    ])
+
+    return birthdayDoc
+}
