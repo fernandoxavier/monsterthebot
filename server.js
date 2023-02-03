@@ -6,6 +6,7 @@ const mongoose = require('mongoose');
 const birthdaySchema = require('./birthday-schema')
 const schedule = require('node-schedule');
 const COOKIE = process.env.YOUTUBE_COOKIE
+const YOUTUBE_ID_TOKEN = process.env.YOUTUBE_ID_TOKEN
 
 // INICIO DISCORD //
 
@@ -23,7 +24,7 @@ const player = new Player(discord, {
     deafenOnJoin: true,
     ytdlRequestOptions: {headers:{
         Cookie: COOKIE,
-        'x-youtube-identity-token': 'QUFFLUhqbm15OEpRTGtQVWt5QzAzamp3UzFfbm1IdUFJQXw='
+        'x-youtube-identity-token': YOUTUBE_ID_TOKEN
     }}
 });
 
@@ -41,7 +42,7 @@ discord.on("ready", () => {
     console.log("Pai ta on 😎");
 
     const guild = discord.guilds.cache.get(process.env.DISCORD_GUILDID)
-    const channel = guild.channels.cache.get('521356562573426700');
+    const channel = guild.channels.cache.get(process.env.DISCORD_CHANNELID);
 
     var j = schedule.scheduleJob('00 00 12 * * 0-6', async () => {
         var listBirthday = checkBirthday()
