@@ -30,7 +30,6 @@ const player = new Player(discord, {
 
 discord.player = player;
 
-
 discord.on("ready", () => {
     mongoose.connect(
         process.env.MONGO_URI,
