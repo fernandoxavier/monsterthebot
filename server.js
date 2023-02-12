@@ -312,7 +312,9 @@ discord.on('interactionCreate', async (interaction) => {
     if (commandName === "play") {
         await interaction.deferReply();
 
-        const query = options.getString('query');
+        var string = options.getString('query');
+
+        const query = string.slice(0, string.indexOf('&'));
 
         let queue = discord.player.createQueue(interaction.guildId, {
             data: {
