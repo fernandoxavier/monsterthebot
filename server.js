@@ -314,7 +314,7 @@ discord.on('interactionCreate', async (interaction) => {
 
         var string = options.getString('query');
 
-        const query = string.slice(0, string.indexOf('&'));
+        const query = string.split('&')[0];
 
         let queue = discord.player.createQueue(interaction.guildId, {
             data: {
